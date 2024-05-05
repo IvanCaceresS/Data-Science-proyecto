@@ -11,7 +11,7 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 
 # Descargar el dataset y preparar el directorio
 dataset_url = "https://storage.googleapis.com/download.tensorflow.org/example_images/flower_photos.tgz"
-data_dir = tf.keras.utils.get_file('flower_photos', origin=dataset_url, untar=True)
+data_dir = tf.keras.utils.get_file('flower_photos', origin=dataset_url, untar=True, cache_dir='.', cache_subdir='')
 data_dir = pathlib.Path(data_dir)
 
 # Crear los directorios para los conjuntos de datos
@@ -116,7 +116,6 @@ bar = plt.bar(keys, values)
 
 x,y = next(train_gen)
 
-
 fig = plt.figure(None, (10,10),frameon=False)
 grid = ImageGrid(fig, 111, 
                  nrows_ncols=(2, 4),  
@@ -128,68 +127,56 @@ for i in range(2*4):
     ax.imshow(x[i],cmap='Greys_r')
     ax.axis('off')  
 
-model = tf.keras.models.Sequential()
-model.add(tf.keras.layers.InputLayer(input_shape=(image_size,image_size,3,))) # Input layer
-model.add(tf.keras.layers.Conv2D(64, kernel_size=(3,3), activation='relu')) # 2D Convolution layer
-model.add(tf.keras.layers.MaxPool2D(pool_size = (2,2))) # Max Pool layer 
-model.add(tf.keras.layers.BatchNormalization()) # Normalization layer
-model.add(tf.keras.layers.Conv2D(64, kernel_size=(3,3), strides = (1,1), activation='relu')) # 2D Convolution layer
-model.add(tf.keras.layers.MaxPool2D(pool_size = (2,2))) # Max Pool layer 
-model.add(tf.keras.layers.BatchNormalization()) # Normalization layer
-model.add(tf.keras.layers.Conv2D(128, kernel_size=(3,3), strides = (1,1), activation='relu')) # 2D Convolution layer
-model.add(tf.keras.layers.MaxPool2D(pool_size = (2,2))) # Max Pool layer 
-model.add(tf.keras.layers.BatchNormalization()) # Normalization layer
-model.add(tf.keras.layers.Conv2D(128, kernel_size=(3,3), strides = (1,1), activation='relu')) # 2D Convolution layer
-model.add(tf.keras.layers.MaxPool2D(pool_size = (2,2))) # Max Pool layer 
-model.add(tf.keras.layers.GlobalMaxPool2D()) # Global Max Pool layer
-model.add(tf.keras.layers.Flatten()) # Dense Layers after flattening the data
-model.add(tf.keras.layers.Dense(128, activation='relu'))
-model.add(tf.keras.layers.Dropout(0.2)) # Dropout
-model.add(tf.keras.layers.Dense(64, activation='relu'))
-model.add(tf.keras.layers.BatchNormalization()) # Normalization layer
-model.add(tf.keras.layers.Dense(5, activation='softmax')) # Add Output Layer
+model_path = './model.keras'
+if os.path.exists(model_path):
+    print("Cargando modelo existente...")
+    model = tf.keras.models.load_model(model_path)
+else:
+    print("Entrenando nuevo modelo...")
+    model = tf.keras.models.Sequential()
+    model.add(tf.keras.layers.InputLayer(input_shape=(image_size,image_size,3))) # Input layer
+    model.add(tf.keras.layers.Conv2D(64, kernel_size=(3,3), activation='relu')) # 2D Convolution layer
+    model.add(tf.keras.layers.MaxPool2D(pool_size=(2,2))) # Max Pool layer
+    model.add(tf.keras.layers.BatchNormalization()) # Normalization layer
+    model.add(tf.keras.layers.Conv2D(64, kernel_size=(3,3), strides=(1,1), activation='relu')) # 2D Convolution layer
+    model.add(tf.keras.layers.MaxPool2D(pool_size=(2,2))) # Max Pool layer
+    model.add(tf.keras.layers.BatchNormalization()) # Normalization layer
+    model.add(tf.keras.layers.Conv2D(128, kernel_size=(3,3), strides=(1,1), activation='relu')) # 2D Convolution layer
+    model.add(tf.keras.layers.MaxPool2D(pool_size=(2,2))) # Max Pool layer
+    model.add(tf.keras.layers.BatchNormalization()) # Normalization layer
+    model.add(tf.keras.layers.Conv2D(128, kernel_size=(3,3), strides=(1,1), activation='relu')) # 2D Convolution layer
+    model.add(tf.keras.layers.MaxPool2D(pool_size=(2,2))) # Max Pool layer
+    model.add(tf.keras.layers.GlobalMaxPool2D()) # Global Max Pool layer
+    model.add(tf.keras.layers.Flatten()) # Dense Layers after flattening the data
+    model.add(tf.keras.layers.Dense(128, activation='relu'))
+    model.add(tf.keras.layers.Dropout(0.2)) # Dropout
+    model.add(tf.keras.layers.Dense(64, activation='relu'))
+    model.add(tf.keras.layers.BatchNormalization()) # Normalization layer
+    model.add(tf.keras.layers.Dense(5, activation='softmax')) # Add Output Layer
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    model.summary()
 
-model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    activity = model.fit(train_gen,
+              epochs=20, # Increase number of epochs if you have sufficient hardware
+              steps_per_epoch=1000//batch_size,  # Number of train images // batch_size
+              validation_data=val_gen,
+              validation_steps=10//batch_size, # Number of val images // batch_size
+             
+              verbose=1
+    )
 
-model.summary()
-
-# activity = model.fit(train_gen,
-#           epochs=20, # Increase number of epochs if you have sufficient hardware
-#           steps_per_epoch= 1000//batch_size,  # Number of train images // batch_size
-#           validation_data=val_gen,
-#           validation_steps = 10//batch_size, # Number of val images // batch_size
-         
-#           verbose = 1
-# )
-
-# # Save the model
-
-# model.save('./model.keras')
+    # Save the model
+    model.save(model_path)
 
 # Predict a single image
-img = cv2.imread('C:/Users/IVAN/.keras/datasets/flower_photos/dandelion/7355522_b66e5d3078_m.jpg')
-img = cv2.resize(img,(256,256))
-img = np.reshape(img,[1,256,256,3])
+img = cv2.imread('C:/Users/IVAN/Downloads/flor.jpeg')
+img = cv2.resize(img, (256,256))
+img = np.reshape(img, [1, 256, 256, 3])
 
-classes = train_gen.class_indices
-class_names = []
-for c in classes:
-    class_names.append(c)
-
-model = tf.keras.models.load_model('./model.keras')
+model = tf.keras.models.load_model(model_path)
 x = img/255.0
 pred = model.predict(x)
 print(pred)
-#Considerando que la predicción es un arreglo de probabilidades, se toma la clase con mayor probabilidad
+# Considering the prediction is an array of probabilities, the class with the highest probability is selected
 predicted_class = class_names[np.argmax(pred)]
 print(predicted_class)
-
-
-
-
-# plt.plot(activity.history['accuracy'], label='accuracy')
-# plt.xlabel('Epoch')
-# plt.ylabel('Accuracy')
-# plt.xticks(list(range(1,21)))
-# plt.ylim([0, 1])
-# plt.legend(loc='lower right')
