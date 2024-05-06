@@ -66,23 +66,13 @@ for category in data_dir.iterdir():
         split_data(category, cat_train_dir, cat_test_dir, cat_val_dir)
 
 print("Datos divididos y almacenados correctamente.")
-
-print(base_train_dir)
-
 data_dir = pathlib.Path(base_train_dir)
 folder = list(data_dir.glob('*'))
 images = list(data_dir.glob('*/*.jpg')) #list of all images (full path)
-print('Folder Structure:')
+print('Estructura de Carpetas:')
 for f in folder:
     print(f)
 print('\nNumber of images: ', len(images))
-
-fig = plt.figure(figsize=(10, 10))
-for i in range(2):
-    plt.subplot(3, 3, i + 1)
-    plt.title(str(images[i]).split('/')[-1], fontsize=10) #get the file name and disply as title
-    plt.imshow(PIL.Image.open(images[i]))
-    ax = plt.axis("off")
 
 image_size = 256
 batch_size = 32
@@ -117,34 +107,13 @@ print(classes)
 class_names = []
 for c in classes:
     class_names.append(c)
-print('The name of the classes are: ', class_names)
-
-unique, counts = np.unique(train_gen.classes, return_counts=True)
-dict1 = dict(zip(train_gen.class_indices, counts))
-
-keys = dict1.keys()
-values = dict1.values()
-
-plt.xticks(rotation='vertical')
-bar = plt.bar(keys, values)
-
-x,y = next(train_gen)
-
-fig = plt.figure(None, (10,10),frameon=False)
-grid = ImageGrid(fig, 111, 
-                 nrows_ncols=(2, 4),  
-                 axes_pad=0.2, 
-                 share_all=True,
-                 )
-for i in range(2*4):
-    ax = grid[i]
-    ax.imshow(x[i],cmap='Greys_r')
-    ax.axis('off')  
-
-model_path = './model.keras'
+print('Los nombre de las clases son: ', class_names)
+ 
+model_path = './modelo_100_epocas.keras'
 if os.path.exists(model_path):
     print("Cargando modelo existente...")
     model = tf.keras.models.load_model(model_path)
+    print("Modelo cargado.")
 else:
     print("Entrenando nuevo modelo...")
     model = tf.keras.models.Sequential()
@@ -175,10 +144,8 @@ else:
               steps_per_epoch=1000//batch_size,  # Number of train images // batch_size
               validation_data=val_gen,
               validation_steps=10//batch_size, # Number of val images // batch_size
-             
               verbose=1
     )
-
     # Save the model
     model.save(model_path)
 
@@ -193,4 +160,5 @@ pred = model.predict(x)
 print(pred)
 # Considering the prediction is an array of probabilities, the class with the highest probability is selected
 predicted_class = class_names[np.argmax(pred)]
-print(predicted_class)
+percentage = np.max(pred)
+print(predicted_class + ": " + str(round(percentage * 100,2)) + '%')
