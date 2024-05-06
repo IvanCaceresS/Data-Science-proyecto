@@ -25,30 +25,44 @@ for dir in (base_train_dir, base_test_dir, base_val_dir):
         os.makedirs(dir)
 
 # Función para dividir los datos
-def split_data(source, train_dir, test_dir, val_dir, train_size=0.8, test_size=0.15, val_size=0.05):
-    files = [file for file in source.iterdir() if file.is_file() and not file.name.startswith('.')]
-    np.random.shuffle(files)
-    files = np.array(files)
-    train, test, val = np.split(files, [int(train_size * len(files)), int((train_size + test_size) * len(files))])
-    for file in train:
-        shutil.copy(file, train_dir)
-    for file in test:
-        shutil.copy(file, test_dir)
-    for file in val:
-        shutil.copy(file, val_dir)
 
-# Aplicar la división de datos a cada subdirectorio de flores
+def split_data(source, train_dir, test_dir, val_dir, train_size=0.8, test_size=0.10, val_size=0.10):
+    # Validar que las proporciones sumen 1.0
+    if train_size + test_size + val_size != 1.0:
+        raise ValueError("La suma de train_size, test_size y val_size debe ser 1.0")
+    
+    # Recopilar archivos, omitiendo archivos ocultos y directorios
+    files = [file for file in source.iterdir() if file.is_file() and not file.name.startswith('.')]
+    np.random.shuffle(files)  # Mezclar los archivos para una división aleatoria
+    files = np.array(files)
+    
+    # Calcular índices para dividir los archivos
+    train, test, val = np.split(files, [int(train_size * len(files)), int((train_size + test_size) * len(files))])
+    
+    # Copiar archivos a los respectivos directorios
+    for dir_path, file_set in zip((train_dir, test_dir, val_dir), (train, test, val)):
+        os.makedirs(dir_path, exist_ok=True)
+        for file in file_set:
+            try:
+                shutil.copy(file, dir_path)
+            except IOError as e:
+                print(f"No se pudo copiar {file} a {dir_path}. Error: {e}")
+
+# Aplicación de la función a cada categoría
+base_train_dir = data_dir / 'train'
+base_test_dir = data_dir / 'test'
+base_val_dir = data_dir / 'val'
+
 for category in data_dir.iterdir():
     if category.is_dir() and category.name not in ['train', 'test', 'val']:
         category_name = category.name
-        # Crear subdirectorios para cada categoría en train, test y val
         cat_train_dir = base_train_dir / category_name
         cat_test_dir = base_test_dir / category_name
         cat_val_dir = base_val_dir / category_name
+        
         for dir in (cat_train_dir, cat_test_dir, cat_val_dir):
-            if not dir.exists():
-                os.makedirs(dir)
-        # Dividir los datos
+            os.makedirs(dir, exist_ok=True)
+        
         split_data(category, cat_train_dir, cat_test_dir, cat_val_dir)
 
 print("Datos divididos y almacenados correctamente.")
@@ -157,7 +171,7 @@ else:
     model.summary()
 
     activity = model.fit(train_gen,
-              epochs=20, # Increase number of epochs if you have sufficient hardware
+              epochs=100, # Increase number of epochs if you have sufficient hardware
               steps_per_epoch=1000//batch_size,  # Number of train images // batch_size
               validation_data=val_gen,
               validation_steps=10//batch_size, # Number of val images // batch_size
