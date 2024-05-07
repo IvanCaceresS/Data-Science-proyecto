@@ -1,25 +1,24 @@
-import numpy as np
-import pandas as pd
-import PIL
 import os
-import tensorflow as tf
-import matplotlib.pyplot as plt
+import random
 import pathlib
-import cv2
 import shutil
-from mpl_toolkits.axes_grid1 import ImageGrid
+import PIL
 
-# Eliminar la carpeta flower_photos si ya existe
-# dataset_path = './flower_photos'
-# if os.path.exists(dataset_path):
-#     print("Eliminando la carpeta flower_photos")
-#     shutil.rmtree(dataset_path)
-#     print("Carpeta eliminada.")
+import cv2
+import numpy as np
+import tensorflow as tf
 
-# Descargar el dataset y preparar el directorio
+def setup_dataset(url, path='./flower_photos'):
+    if os.path.exists(path):
+        print("Eliminando la carpeta flower_photos")
+        shutil.rmtree(path)   
+        print("Carpeta eliminada.")
+    
+    data_dir = tf.keras.utils.get_file('flower_photos', origin=url, untar=True, cache_dir='.', cache_subdir='')
+    return pathlib.Path(data_dir)
+
 dataset_url = "https://storage.googleapis.com/download.tensorflow.org/example_images/flower_photos.tgz"
-data_dir = tf.keras.utils.get_file('flower_photos', origin=dataset_url, untar=True, cache_dir='.', cache_subdir='')
-data_dir = pathlib.Path(data_dir)
+data_dir = setup_dataset(dataset_url)
 
 # Crear los directorios para los conjuntos de datos
 base_train_dir = data_dir / 'train'
@@ -34,7 +33,7 @@ for dir in (base_train_dir, base_test_dir, base_val_dir):
 # Función para dividir los datos
 def split_data(source, train_dir, test_dir, val_dir, train_size=0.8, test_size=0.10, val_size=0.10):
     # Validar que las proporciones sumen 1.0
-    if train_size + test_size + val_size != 1.0:
+    if not np.isclose(train_size + test_size + val_size, 1.0, atol=1e-6):
         raise ValueError("La suma de train_size, test_size y val_size debe ser 1.0")
     
     # Recopilar archivos, omitiendo archivos ocultos y directorios
@@ -67,28 +66,38 @@ for category in data_dir.iterdir():
         split_data(category, cat_train_dir, cat_test_dir, cat_val_dir)
 
 print("Datos divididos y almacenados correctamente.")
+print("-"*50)
+
+val_dir = pathlib.Path(base_val_dir)
+val_images = list(val_dir.glob('*/*.jpg')) #list of all images (full path)
+print('\nDirectorio de validación: ', val_dir)
+print('Número de imágenes conjunto validación: ', len(val_images))
 
 data_dir = pathlib.Path(base_train_dir)
 folder = list(data_dir.glob('*'))
 images = list(data_dir.glob('*/*.jpg')) #list of all images (full path)
-print('Estructura de Carpetas:')
-for f in folder:
-    print(f)
-print('\nNúmero de imágenes: ', len(images))
+print('\nDirectorio de entrenamiento: ', data_dir)
+print('Número de imágenes conjunto entrenamiento: ', len(images))
+print("-"*80,'\n')
 
 image_size = 256
-batch_size = 32
+batch_size = 128
 
 idg = tf.keras.preprocessing.image.ImageDataGenerator(
     rescale=1./255,
+    rotation_range=40,       # Rotar las imágenes en un rango de hasta 40 grados
+    width_shift_range=0.2,  # Desplazamientos horizontales
+    height_shift_range=0.2, # Desplazamientos verticales
+    shear_range=0.2,        # Corte de imágenes
+    zoom_range=0.2,         # Zoom aleatorio
     horizontal_flip=True,
     vertical_flip=True,
-    validation_split=0.2
+    fill_mode='nearest',    # Rellenar píxeles que podrían quedar vacíos después de una transformación
 )
+
 
 train_gen = idg.flow_from_directory(base_train_dir,
                                     target_size=(image_size, image_size),
-                                    subset='training',
                                     class_mode='categorical',
                                     batch_size=batch_size,
                                     shuffle=True,
@@ -96,27 +105,41 @@ train_gen = idg.flow_from_directory(base_train_dir,
                                     )
 
 val_gen = idg.flow_from_directory(base_val_dir,
-                                  target_size=(image_size, image_size),                                                   
-                                  subset='validation',
+                                  target_size=(image_size, image_size),
                                   class_mode='categorical',
                                   batch_size=batch_size,
                                   shuffle=True,
                                   seed=1
                                   )
 
+#Classes train_gen
 classes = train_gen.class_indices
 print(classes)
 class_names = []
 for c in classes:
     class_names.append(c)
-print('Los nombre de las clases son: ', class_names)
- 
-#Numero de imagenes de entrenamiento
-print("Número de imagenes de entrenamiento: ", len(train_gen))
-#Numero de imagenes de validación
-print("Número de imagenes de validación: ", len(val_gen))
+print('Los nombre de las clases de train son: ', class_names)
 
-model_path = './modelo_240_epocas.keras'
+print('\n',"-"*80,'\n')
+
+#Classes val_gen
+classes = val_gen.class_indices
+print(classes)
+class_names = []
+for c in classes:
+    class_names.append(c)
+print('Los nombre de las clases de val son: ', class_names)
+
+print('\n',"-"*80,'\n')
+
+#Numero de imagenes de entrenamiento
+print("Número de batches de entrenamiento: ", len(train_gen))
+#Numero de imagenes de validación
+print("Número de batches de validación: ", len(val_gen))
+
+print('\n',"-"*80,'\n')
+
+model_path = './modelo_500_epocas_128_batchsize_imagenes_iniciales.keras'
 if os.path.exists(model_path):
     print("Cargando modelo existente...")
     model = tf.keras.models.load_model(model_path)
@@ -144,30 +167,59 @@ else:
     model.add(tf.keras.layers.BatchNormalization()) # Normalization layer
     model.add(tf.keras.layers.Dense(5, activation='softmax')) # Add Output Layer
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-    model.summary()
+    #model.summary()
+
+    #Imprime el número de imágenes de entrenamiento y validación
+    print("Número de imágenes de entrenamiento: ", len(train_gen.filenames))
+    print("Número de imágenes de validación: ", len(val_gen.filenames))
+
+    #Imprime steps_per_epoch y validation_steps
+    print("steps_per_epoch: ", len(train_gen.filenames) // batch_size)
+    print("validation_steps: ", len(val_gen.filenames) // batch_size)
+
+    print('\n',"-"*80,'\n')
 
     activity = model.fit(
         train_gen,
-        epochs=240,  # Aumenta el número de épocas si tienes suficiente hardware
-        steps_per_epoch=len(train_gen),  # Número total de lotes en el generador de entrenamiento
+        epochs=500,  # Número máximo de épocas
+        steps_per_epoch = len(train_gen.filenames) // batch_size,
         validation_data=val_gen,
-        validation_steps=len(val_gen),  # Número total de lotes en el generador de validación
+        validation_steps = len(val_gen.filenames) // batch_size,
         verbose=1
     )
     # Save the model
     model.save(model_path)
 
-# Predict a single image
-img = cv2.imread('./flower_photos/train/roses/12240303_80d87f77a3_n.jpg')
-#img = cv2.imread('C:/Users/IVAN/Downloads/flor.jpg')
-img = cv2.resize(img, (256,256))
-img = np.reshape(img, [1, 256, 256, 3])
+#PREDICCION DE 5 IMAGENES POR CADA CATEGORIA:
 
-model = tf.keras.models.load_model(model_path)
-x = img/255.0
-pred = model.predict(x)
-print(pred)
-# Considering the prediction is an array of probabilities, the class with the highest probability is selected
-predicted_class = class_names[np.argmax(pred)]
-percentage = np.max(pred)
-print(predicted_class + ": " + str(round(percentage * 100,2)) + '%')
+#Función para predecir una imagen
+def predict_image(image_path):
+    img = cv2.imread(image_path)
+    img = cv2.resize(img, (image_size, image_size))
+    img = np.reshape(img, [1, image_size, image_size, 3])
+    x = img / 255.0
+    pred = model.predict(x)
+    predicted_class = class_names[np.argmax(pred)]
+    percentage = np.max(pred)
+    return image_path, predicted_class, round(percentage * 100, 2)  # Devuelve también la ruta de la imagen
+
+# Función para procesar imágenes por categoría
+def process_images_by_category(base_dir, num_images=5):
+    categories = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
+    results = {}
+    for category in categories:
+        category_path = os.path.join(base_dir, category)
+        images = [os.path.join(category_path, img) for img in os.listdir(category_path) if img.endswith('.jpg')]
+        selected_images = random.sample(images, min(num_images, len(images)))  # Selecciona 5 imágenes o menos si no hay suficientes
+        results[category] = [predict_image(img) for img in selected_images]
+    return results
+
+# Ruta al directorio de test (para la predicción)
+test_dir = './flower_photos/test'
+
+# Ejecuta la predicción
+predictions = process_images_by_category(test_dir)
+for category, results in predictions.items():
+    print(f"Categoría: {category}")
+    for image_path, predicted_class, confidence in results:
+        print(f"Imagen: {image_path} - Predicha como {predicted_class} con una confianza del {confidence}%")
