@@ -81,7 +81,7 @@ print('Número de imágenes conjunto entrenamiento: ', len(images))
 print("-"*80,'\n')
 
 image_size = 256
-batch_size = 128
+batch_size = 64
 
 idg = tf.keras.preprocessing.image.ImageDataGenerator(
     rescale=1./255,
@@ -139,7 +139,7 @@ print("Número de batches de validación: ", len(val_gen))
 
 print('\n',"-"*80,'\n')
 
-model_path = './modelo_500_epocas_128_batchsize_imagenes_iniciales.keras'
+model_path = './modelo_1000_epocas_64_batchsize_imagenes_iniciales.keras'
 if os.path.exists(model_path):
     print("Cargando modelo existente...")
     model = tf.keras.models.load_model(model_path)
@@ -181,7 +181,7 @@ else:
 
     activity = model.fit(
         train_gen,
-        epochs=500,  # Número máximo de épocas
+        epochs=1000,  # Número máximo de épocas
         steps_per_epoch = len(train_gen.filenames) // batch_size,
         validation_data=val_gen,
         validation_steps = len(val_gen.filenames) // batch_size,
