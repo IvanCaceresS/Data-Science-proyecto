@@ -1,82 +1,26 @@
 import os
 import random
-import pathlib
-import shutil
-import PIL
+from pathlib import Path
 
 import cv2
 import numpy as np
 import tensorflow as tf
 
-def setup_dataset(url, path='./flower_photos'):
-    if os.path.exists(path):
-        print("Eliminando la carpeta flower_photos")
-        shutil.rmtree(path)   
-        print("Carpeta eliminada.")
-    
-    data_dir = tf.keras.utils.get_file('flower_photos', origin=url, untar=True, cache_dir='.', cache_subdir='')
-    return pathlib.Path(data_dir)
+# Definir los directorios base
+base_dir = Path('./flower_photos')  # Directorio con las categorías originales
+base_train_dir = Path('./flower_photos/train')
+base_test_dir = Path('./flower_photos/test')
+base_val_dir = Path('./flower_photos/val')
 
-dataset_url = "https://storage.googleapis.com/download.tensorflow.org/example_images/flower_photos.tgz"
-data_dir = setup_dataset(dataset_url)
-
-# Crear los directorios para los conjuntos de datos
-base_train_dir = data_dir / 'train'
-base_test_dir = data_dir / 'test'
-base_val_dir = data_dir / 'val'
-
-# Crear directorios de base si no existen
-for dir in (base_train_dir, base_test_dir, base_val_dir):
-    if not dir.exists():
-        os.makedirs(dir)
-
-# Función para dividir los datos
-def split_data(source, train_dir, test_dir, val_dir, train_size=0.8, test_size=0.10, val_size=0.10):
-    # Validar que las proporciones sumen 1.0
-    if not np.isclose(train_size + test_size + val_size, 1.0, atol=1e-6):
-        raise ValueError("La suma de train_size, test_size y val_size debe ser 1.0")
-    
-    # Recopilar archivos, omitiendo archivos ocultos y directorios
-    files = [file for file in source.iterdir() if file.is_file() and not file.name.startswith('.')]
-    np.random.shuffle(files)  # Mezclar los archivos para una división aleatoria
-    files = np.array(files)
-    
-    # Calcular índices para dividir los archivos
-    train, test, val = np.split(files, [int(train_size * len(files)), int((train_size + test_size) * len(files))])
-    
-    # Copiar archivos a los respectivos directorios
-    for dir_path, file_set in zip((train_dir, test_dir, val_dir), (train, test, val)):
-        os.makedirs(dir_path, exist_ok=True)
-        for file in file_set:
-            destination_file = dir_path / file.name
-            if not destination_file.exists():
-                shutil.copy(file, dir_path)
-
-# Aplicación de la función a cada categoría
-for category in data_dir.iterdir():
-    if category.is_dir() and category.name not in ['train', 'test', 'val']:
-        category_name = category.name
-        cat_train_dir = base_train_dir / category_name
-        cat_test_dir = base_test_dir / category_name
-        cat_val_dir = base_val_dir / category_name
-        
-        for dir in (cat_train_dir, cat_test_dir, cat_val_dir):
-            os.makedirs(dir, exist_ok=True)
-        
-        split_data(category, cat_train_dir, cat_test_dir, cat_val_dir)
-
-print("Datos divididos y almacenados correctamente.")
-print("-"*50)
-
-val_dir = pathlib.Path(base_val_dir)
+val_dir = Path(base_val_dir)
 val_images = list(val_dir.glob('*/*.jpg')) #list of all images (full path)
-print('\nDirectorio de validación: ', val_dir)
+print('\nCarpeta de validación: ', val_dir)
 print('Número de imágenes conjunto validación: ', len(val_images))
 
-data_dir = pathlib.Path(base_train_dir)
+data_dir = Path(base_train_dir)
 folder = list(data_dir.glob('*'))
 images = list(data_dir.glob('*/*.jpg')) #list of all images (full path)
-print('\nDirectorio de entrenamiento: ', data_dir)
+print('\nCarpeta de entrenamiento: ', data_dir)
 print('Número de imágenes conjunto entrenamiento: ', len(images))
 print("-"*80,'\n')
 
@@ -139,7 +83,7 @@ print("Número de batches de validación: ", len(val_gen))
 
 print('\n',"-"*80,'\n')
 
-model_path = './modelo_1000_epocas_64_batchsize_imagenes_iniciales.keras'
+model_path = './modelos/modelo_1000_epocas_64_batchsize_imagenes_iniciales_9969.keras'
 if os.path.exists(model_path):
     print("Cargando modelo existente...")
     model = tf.keras.models.load_model(model_path)
@@ -192,7 +136,7 @@ else:
 
 #PREDICCION DE 5 IMAGENES POR CADA CATEGORIA:
 
-#Función para predecir una imagen
+# Función para predecir una imagen
 def predict_image(image_path):
     img = cv2.imread(image_path)
     img = cv2.resize(img, (image_size, image_size))
@@ -203,23 +147,41 @@ def predict_image(image_path):
     percentage = np.max(pred)
     return image_path, predicted_class, round(percentage * 100, 2)  # Devuelve también la ruta de la imagen
 
-# Función para procesar imágenes por categoría
+# Función para procesar imágenes por categoría y calcular estadísticas generales
 def process_images_by_category(base_dir, num_images=5):
     categories = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
     results = {}
+    total_correct = 0
+    total_images = 0
     for category in categories:
+        correct_predictions = 0
         category_path = os.path.join(base_dir, category)
         images = [os.path.join(category_path, img) for img in os.listdir(category_path) if img.endswith('.jpg')]
         selected_images = random.sample(images, min(num_images, len(images)))  # Selecciona 5 imágenes o menos si no hay suficientes
-        results[category] = [predict_image(img) for img in selected_images]
-    return results
+        predictions = [predict_image(img) for img in selected_images]
+        for image_path, predicted_class, confidence in predictions:
+            if predicted_class == category:
+                correct_predictions += 1
+        results[category] = {
+            "predictions": predictions,
+            "correct": correct_predictions,
+            "total": len(selected_images)
+        }
+        total_correct += correct_predictions
+        total_images += len(selected_images)
+    overall_accuracy = (total_correct / total_images) * 100 if total_images > 0 else 0
+    return results, total_correct, total_images, overall_accuracy
 
 # Ruta al directorio de test (para la predicción)
 test_dir = './flower_photos/test'
 
-# Ejecuta la predicción
-predictions = process_images_by_category(test_dir)
-for category, results in predictions.items():
+# Ejecuta la predicción y obtiene estadísticas generales
+predictions, total_correct, total_images, overall_accuracy = process_images_by_category(test_dir)
+for category, data in predictions.items():
     print(f"Categoría: {category}")
-    for image_path, predicted_class, confidence in results:
+    print(f"Predijo correctamente {data['correct']} de {data['total']} imágenes")
+    for image_path, predicted_class, confidence in data['predictions']:
         print(f"Imagen: {image_path} - Predicha como {predicted_class} con una confianza del {confidence}%")
+
+# Imprime el resumen final
+print(f"\nTotal general: Predijo correctamente {total_correct} de {total_images} imágenes ({overall_accuracy:.2f}%)")
