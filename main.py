@@ -9,6 +9,13 @@ import cv2
 import shutil
 from mpl_toolkits.axes_grid1 import ImageGrid
 
+# Eliminar la carpeta flower_photos si ya existe
+# dataset_path = './flower_photos'
+# if os.path.exists(dataset_path):
+#     print("Eliminando la carpeta flower_photos")
+#     shutil.rmtree(dataset_path)
+#     print("Carpeta eliminada.")
+
 # Descargar el dataset y preparar el directorio
 dataset_url = "https://storage.googleapis.com/download.tensorflow.org/example_images/flower_photos.tgz"
 data_dir = tf.keras.utils.get_file('flower_photos', origin=dataset_url, untar=True, cache_dir='.', cache_subdir='')
@@ -25,7 +32,6 @@ for dir in (base_train_dir, base_test_dir, base_val_dir):
         os.makedirs(dir)
 
 # Función para dividir los datos
-
 def split_data(source, train_dir, test_dir, val_dir, train_size=0.8, test_size=0.10, val_size=0.10):
     # Validar que las proporciones sumen 1.0
     if train_size + test_size + val_size != 1.0:
@@ -43,16 +49,11 @@ def split_data(source, train_dir, test_dir, val_dir, train_size=0.8, test_size=0
     for dir_path, file_set in zip((train_dir, test_dir, val_dir), (train, test, val)):
         os.makedirs(dir_path, exist_ok=True)
         for file in file_set:
-            try:
+            destination_file = dir_path / file.name
+            if not destination_file.exists():
                 shutil.copy(file, dir_path)
-            except IOError as e:
-                print(f"No se pudo copiar {file} a {dir_path}. Error: {e}")
 
 # Aplicación de la función a cada categoría
-base_train_dir = data_dir / 'train'
-base_test_dir = data_dir / 'test'
-base_val_dir = data_dir / 'val'
-
 for category in data_dir.iterdir():
     if category.is_dir() and category.name not in ['train', 'test', 'val']:
         category_name = category.name
@@ -66,13 +67,14 @@ for category in data_dir.iterdir():
         split_data(category, cat_train_dir, cat_test_dir, cat_val_dir)
 
 print("Datos divididos y almacenados correctamente.")
+
 data_dir = pathlib.Path(base_train_dir)
 folder = list(data_dir.glob('*'))
 images = list(data_dir.glob('*/*.jpg')) #list of all images (full path)
 print('Estructura de Carpetas:')
 for f in folder:
     print(f)
-print('\nNumber of images: ', len(images))
+print('\nNúmero de imágenes: ', len(images))
 
 image_size = 256
 batch_size = 32
@@ -109,7 +111,12 @@ for c in classes:
     class_names.append(c)
 print('Los nombre de las clases son: ', class_names)
  
-model_path = './modelo_100_epocas.keras'
+#Numero de imagenes de entrenamiento
+print("Número de imagenes de entrenamiento: ", len(train_gen))
+#Numero de imagenes de validación
+print("Número de imagenes de validación: ", len(val_gen))
+
+model_path = './modelo_240_epocas.keras'
 if os.path.exists(model_path):
     print("Cargando modelo existente...")
     model = tf.keras.models.load_model(model_path)
@@ -139,18 +146,20 @@ else:
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     model.summary()
 
-    activity = model.fit(train_gen,
-              epochs=100, # Increase number of epochs if you have sufficient hardware
-              steps_per_epoch=1000//batch_size,  # Number of train images // batch_size
-              validation_data=val_gen,
-              validation_steps=10//batch_size, # Number of val images // batch_size
-              verbose=1
+    activity = model.fit(
+        train_gen,
+        epochs=240,  # Aumenta el número de épocas si tienes suficiente hardware
+        steps_per_epoch=len(train_gen),  # Número total de lotes en el generador de entrenamiento
+        validation_data=val_gen,
+        validation_steps=len(val_gen),  # Número total de lotes en el generador de validación
+        verbose=1
     )
     # Save the model
     model.save(model_path)
 
 # Predict a single image
-img = cv2.imread('C:/Users/IVAN/Downloads/flor.jpeg')
+img = cv2.imread('./flower_photos/train/roses/12240303_80d87f77a3_n.jpg')
+#img = cv2.imread('C:/Users/IVAN/Downloads/flor.jpg')
 img = cv2.resize(img, (256,256))
 img = np.reshape(img, [1, 256, 256, 3])
 
