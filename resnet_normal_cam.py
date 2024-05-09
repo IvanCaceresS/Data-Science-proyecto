@@ -83,7 +83,8 @@ print("Número de batches de validación: ", len(val_gen))
 
 print('\n', "-" * 80, '\n')
 
-model_path = './modelos/modelo_resnet50_100epocas_32_batchsize.keras'
+model_path = './modelos/modelo_resnet50_2000epocas_32_batchsize.keras'
+#model_path = './modelos/modelo_1000epocas_64batchsize.keras'
 
 # Función para configurar ResNet50
 def create_resnet_model(input_shape, num_classes):

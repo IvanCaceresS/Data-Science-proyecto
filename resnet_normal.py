@@ -84,7 +84,7 @@ print("Número de batches de validación: ", len(val_gen))
 
 print('\n', "-" * 80, '\n')
 
-model_path = './modelos/modelo_resnet50_100epocas_32_batchsize.keras'
+model_path = './modelos/modelo_resnet50_2000epocas_32_batchsize.keras'
 
 # Función para configurar ResNet50
 def create_resnet_model(input_shape, num_classes):
@@ -136,7 +136,7 @@ else:
 
     model.fit(
         train_gen,
-        epochs=100,
+        epochs=2000,
         steps_per_epoch=len(train_gen.filenames) // batch_size,
         validation_data=val_gen,
         validation_steps=len(val_gen.filenames) // batch_size,
@@ -183,7 +183,7 @@ def process_images_by_category(base_dir, num_images=5):
     return results, total_correct, total_images, overall_accuracy
 
 # Ruta al directorio de test (para la predicción)
-test_dir = './flower_photos/train'
+test_dir = './flower_photos/test'
 
 # Ejecuta la predicción y obtiene estadísticas generales
 predictions, total_correct, total_images, overall_accuracy = process_images_by_category(test_dir)
