@@ -1,0 +1,6 @@
+Precisión final de Entrenamiento: 0.7955
+Precisión final de Validación: 0.7398
+Pérdida final de Entrenamiento: 0.7340
+Pérdida final de Validación: 0.9459
+Análisis: Ajuste adecuado
+Epoca detenida: 429/1000

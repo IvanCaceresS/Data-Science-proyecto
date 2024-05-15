@@ -3,3 +3,4 @@ flower_photos
 modelos/modelo_resnet50_20epocas_32batchsize.keras
 modelos/modelo_resnet50_100epocas_32_batchsize.keras
 modelos/modelo_resnet50_2000epocas_32_batchsize.keras
+modelos/modelo_resnet50_100epocas_32batchsize_20patience.keras

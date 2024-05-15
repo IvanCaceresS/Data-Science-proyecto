@@ -4,7 +4,9 @@ import tensorflow as tf
 from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Flatten, Conv2D, MaxPooling2D, BatchNormalization, GlobalMaxPooling2D, Dropout, InputLayer
 from tensorflow.keras.models import Model
+from tensorflow.keras.callbacks import EarlyStopping
 import matplotlib.pyplot as plt
+from tensorflow.keras.regularizers import l2
 
 # Definir los directorios base
 base_dir = Path('./flower_photos')
@@ -24,14 +26,14 @@ print("-" * 80, '\n')
 image_size = 256
 batch_size = 32
 
-# Configuración del generador de datos
+# Configuración del generador de datos con aumento de datos
 data_gen_args = dict(
     rescale=1./255,
     rotation_range=40,
-    width_shift_range=0.2,
-    height_shift_range=0.2,
-    shear_range=0.2,
-    zoom_range=0.2,
+    width_shift_range=0.3,
+    height_shift_range=0.3,
+    shear_range=0.3,
+    zoom_range=0.3,
     horizontal_flip=True,
     vertical_flip=True,
     fill_mode='nearest'
@@ -70,41 +72,41 @@ print(f"Número de batches de entrenamiento: {len(train_gen)}")
 print(f"Número de batches de validación: {len(val_gen)}")
 print("-" * 80, '\n')
 
-model_path = './modelos/modelo_100epocas_32batchsize.keras'
-#model_path = './modelos/modelo_resnet50_100epocas_32batchsize.keras'
+model_path = './modelos/modelo_resnet50_1000epocas_32batchsize_200patience.keras'
 
 # Función para configurar ResNet50
 def create_resnet_model(input_shape, num_classes):
     base_model = ResNet50(weights='imagenet', include_top=False, input_shape=input_shape)
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
-    x = Dense(1024, activation='relu')(x)
-    predictions = Dense(num_classes, activation='softmax')(x)
+    x = Dense(1024, activation='relu', kernel_regularizer=l2(0.01))(x)
+    x = Dropout(0.5)(x)  # Incrementar dropout
+    predictions = Dense(num_classes, activation='softmax', kernel_regularizer=l2(0.01))(x)
 
     model = Model(inputs=base_model.input, outputs=predictions)
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     return model
 
-# Crear modelo personalizado
+# Crear modelo personalizado con regularización
 def create_custom_model(input_shape, num_classes):
     model = tf.keras.models.Sequential([
         InputLayer(input_shape=input_shape),
-        Conv2D(64, (3, 3), activation='relu'),
+        Conv2D(64, (3, 3), activation='relu', kernel_regularizer=l2(0.01)),
         MaxPooling2D(2, 2),
         BatchNormalization(),
-        Conv2D(64, (3, 3), activation='relu'),
+        Conv2D(64, (3, 3), activation='relu', kernel_regularizer=l2(0.01)),
         MaxPooling2D(2, 2),
         BatchNormalization(),
-        Conv2D(128, (3, 3), activation='relu'),
+        Conv2D(128, (3, 3), activation='relu', kernel_regularizer=l2(0.01)),
         MaxPooling2D(2, 2),
         BatchNormalization(),
-        Conv2D(128, (3, 3), activation='relu'),
+        Conv2D(128, (3, 3), activation='relu', kernel_regularizer=l2(0.01)),
         MaxPooling2D(2, 2),
         GlobalMaxPooling2D(),
         Flatten(),
-        Dense(128, activation='relu'),
-        Dropout(0.2),
-        Dense(64, activation='relu'),
+        Dense(128, activation='relu', kernel_regularizer=l2(0.01)),
+        Dropout(0.5),  # Incrementar dropout
+        Dense(64, activation='relu', kernel_regularizer=l2(0.01)),
         BatchNormalization(),
         Dense(num_classes, activation='softmax')
     ])
@@ -163,12 +165,15 @@ def plot_metrics(history, model_path):
     
     # Guardar los resultados finales en un archivo de texto
     results_path = model_path.replace('.keras', '.txt')
+    stopped_epoch = len(acc)
+    total_epochs = history.params['epochs']
     with open(results_path, 'w', encoding='utf-8') as f:
         f.write(f'Precisión final de Entrenamiento: {final_train_acc:.4f}\n')
         f.write(f'Precisión final de Validación: {final_val_acc:.4f}\n')
         f.write(f'Pérdida final de Entrenamiento: {final_train_loss:.4f}\n')
         f.write(f'Pérdida final de Validación: {final_val_loss:.4f}\n')
         f.write(f'Análisis: {overfitting_text}\n')
+        f.write(f'Epoca detenida: {stopped_epoch}/{total_epochs}\n')
 
 if os.path.exists(model_path):
     print(f"Modelo: {model_path} ya existe.")
@@ -183,13 +188,17 @@ else:
         print("Configurando el modelo personalizado...")
         model = create_custom_model(input_shape=(image_size, image_size, 3), num_classes=len(train_gen.class_indices))
 
+    # Early Stopping
+    early_stopping = EarlyStopping(monitor='val_loss', patience=200, restore_best_weights=True)
+
     history = model.fit(
         train_gen,
-        epochs=100,
+        epochs=1000,
         steps_per_epoch=len(train_gen),
         validation_data=val_gen,
         validation_steps=len(val_gen),
-        verbose=1
+        verbose=1,
+        callbacks=[early_stopping]  # Añade early stopping
     )
     model.save(model_path)
     plot_metrics(history, model_path)
