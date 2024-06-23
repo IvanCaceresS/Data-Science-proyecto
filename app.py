@@ -15,7 +15,7 @@ care_instructions = {
     'Tulipanes': 'Riego moderado, mantener el suelo húmedo pero bien drenado. Luz solar indirecta. Plantar los bulbos en otoño para una floración primaveral. Fertilizar con un fertilizante de bulbos al plantar y nuevamente cuando emerjan las hojas.'
 }
 
-model_path = './modelos/modelo_resnet50_2000epocas_32_batchsize.keras'
+model_path = './modelos/modelo_resnet50_1000epocas_32batchsize_200patience.keras'
 
 # Cargar el modelo si existe
 if os.path.exists(model_path):
