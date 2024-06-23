@@ -1,4 +1,4 @@
-# Data-Science-proyecto
+# Data Science proyecto
 
 ## Requisitos
 - Versión de Python: 3.9
