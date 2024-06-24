@@ -4,3 +4,4 @@ modelos/modelo_resnet50_100epocas_32_batchsize.keras
 modelos/modelo_resnet50_2000epocas_32_batchsize.keras
 modelos/modelo_resnet50_100epocas_32batchsize_20patience.keras
 modelos/modelo_resnet50_1000epocas_32batchsize_200patience.keras
+predicciones

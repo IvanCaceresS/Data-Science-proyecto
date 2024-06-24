@@ -2,8 +2,11 @@ import os
 import cv2
 import numpy as np
 import tensorflow as tf
-from tkinter import Tk, Label, Canvas, Button
+from tkinter import Tk, Label, Canvas, Button, Toplevel, Frame, Scrollbar, VERTICAL, RIGHT, Y, BOTH
+from tkinter import ttk
+from tkinter import font as tkFont
 from PIL import Image, ImageTk
+import datetime
 
 # Configuración de la ruta del modelo y nombres de las clases en español
 CLASS_NAMES = ['Margarita', 'Diente de león', 'Rosas', 'Girasoles', 'Tulipanes']
@@ -21,9 +24,13 @@ FRAME_RECT = (200, 100, 450, 350)
 BGR_TO_RGB = cv2.COLOR_BGR2RGB
 BRIGHTNESS_THRESHOLD_LOW = 30
 BRIGHTNESS_THRESHOLD_HIGH = 180
+PREDICTION_DELAY = 50  # Delay de 50 ms entre predicciones
 
-# Variable global para controlar la actualización de frames
+# Variables globales
 continue_prediction = True
+last_frame = None
+last_results = None
+prediction_saved = False
 
 def load_model(path):
     if os.path.exists(path):
@@ -55,9 +62,13 @@ def is_frame_too_bright(frame, threshold=BRIGHTNESS_THRESHOLD_HIGH):
     return brightness > threshold
 
 def show_prediction_results(results):
+    global last_results, prediction_saved
+    last_results = results
+    prediction_saved = False  # Reset the flag when new results are shown
+
     # Configurar el texto principal
     most_likely, confidence = results[0]
-    result_text = f"Más probable: {most_likely} ({confidence * 100:.2f}%)\nCuidados: {CARE_INSTRUCTIONS[most_likely]}"
+    result_text = f"Más probable: {most_likely} ({confidence * 100:.2f}%)"
     prediction_label.config(text=result_text, wraplength=600, anchor='w', justify='left')
     prediction_label.pack(pady=10)
 
@@ -72,12 +83,13 @@ def show_prediction_results(results):
         other_labels[idx - 1].pack()
 
 def update_frame():
+    global last_frame
     if continue_prediction:
         ret, frame = cap.read()
         if ret:
             start_point = (FRAME_RECT[0], FRAME_RECT[1])
             end_point = (FRAME_RECT[2], FRAME_RECT[3])
-            color = (255, 0, 0)
+            color = (255, 113, 82)
             thickness = 2
             cv2.rectangle(frame, start_point, end_point, color, thickness)
             frame = cv2.cvtColor(frame, BGR_TO_RGB)
@@ -87,7 +99,7 @@ def update_frame():
             canvas.create_image(0, 0, anchor='nw', image=imgtk)
             
             if is_frame_dark(frame):
-                prediction_label.config(text="Cámara tapada. No se puede realizar la predicción.", wraplength=600, anchor='w', justify='left')
+                prediction_label.config(text="Cámara tapada o muy poca luz. No se puede realizar la predicción.", wraplength=600, anchor='w', justify='left')
                 prediction_label.pack(pady=10)
                 label_others.pack_forget()
                 for label in other_labels:
@@ -102,21 +114,117 @@ def update_frame():
                 crop_img = frame[FRAME_RECT[1]:FRAME_RECT[3], FRAME_RECT[0]:FRAME_RECT[2]]
                 results = predict_image(crop_img, model, CLASS_NAMES)
                 show_prediction_results(results)
-                
-        root.after(100, update_frame)
+                last_frame = crop_img
+
+        root.after(PREDICTION_DELAY, update_frame)
+
+def save_prediction():
+    global prediction_saved
+    if last_frame is not None and last_results is not None:
+        if not prediction_saved:
+            most_likely, _ = last_results[0]
+            now = datetime.datetime.now()
+            timestamp = now.strftime('%Y-%m-%d_%H-%M-%S')
+            dir_name = f"./predicciones/{most_likely}_{timestamp}"
+            os.makedirs(dir_name, exist_ok=True)
+            
+            # Guardar la imagen
+            img_path = os.path.join(dir_name, "imagen.jpg")
+            cv2.imwrite(img_path, cv2.cvtColor(last_frame, cv2.COLOR_RGB2BGR))
+            
+            # Guardar los resultados
+            results_path = os.path.join(dir_name, "resultados.txt")
+            with open(results_path, "w") as f:
+                for result in last_results:
+                    f.write(f"{result[0]}: {result[1] * 100:.2f}%\n")
+            
+            print(f"[INFO] Predicción guardada en {dir_name}")
+            prediction_label.config(text="Predicción guardada.", wraplength=600, anchor='w', justify='left')
+            prediction_saved = True
+        else:
+            print("[INFO] Predicción ya fue guardada.")
+            prediction_label.config(text="Predicción ya fue guardada.", wraplength=600, anchor='w', justify='left')
 
 def stop_prediction():
     global continue_prediction
     continue_prediction = False
     finalize_button.pack_forget()
-    restart_button.pack(pady=20)
+    save_button.grid()
+    restart_button.grid()
+    view_predictions_button.grid()
 
 def restart_prediction():
     global continue_prediction
     continue_prediction = True
-    restart_button.pack_forget()
+    save_button.grid_remove()
+    restart_button.grid_remove()
+    view_predictions_button.grid_remove()
     finalize_button.pack(pady=20)
     update_frame()
+
+def view_predictions():
+    pred_dir = './predicciones'
+    if not os.path.exists(pred_dir):
+        prediction_label.config(text="No hay predicciones guardadas.", wraplength=600, anchor='w', justify='left')
+        return
+
+    pred_window = Toplevel(root)
+    pred_window.title("Predicciones Anteriores")
+    pred_window.geometry("800x600")
+    
+    # Cambiar el icono de la ventana
+    icon_path = './icon.png'  # Asegúrate de que este archivo exista
+    icon_img = ImageTk.PhotoImage(file=icon_path)
+    pred_window.iconphoto(False, icon_img)
+    
+    frame = Frame(pred_window)
+    frame.pack(fill=BOTH, expand=True)
+    
+    canvas = Canvas(frame)
+    scrollbar = Scrollbar(frame, orient=VERTICAL, command=canvas.yview)
+    scrollable_frame = Frame(canvas)
+    
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: canvas.configure(
+            scrollregion=canvas.bbox("all")
+        )
+    )
+    
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+    
+    scrollbar.pack(side=RIGHT, fill=Y)
+    canvas.pack(fill=BOTH, expand=True)
+    
+    row = 0
+    col = 0
+    for folder in os.listdir(pred_dir):
+        folder_path = os.path.join(pred_dir, folder)
+        if os.path.isdir(folder_path):
+            img_path = os.path.join(folder_path, "imagen.jpg")
+            results_path = os.path.join(folder_path, "resultados.txt")
+            
+            if os.path.exists(img_path) and os.path.exists(results_path):
+                img = Image.open(img_path)
+                img.thumbnail((150, 150), Image.LANCZOS)
+                imgtk = ImageTk.PhotoImage(img)
+                
+                img_label = Label(scrollable_frame, image=imgtk)
+                img_label.image = imgtk
+                img_label.grid(row=row, column=col, padx=10, pady=10)
+                
+                with open(results_path, "r") as f:
+                    results_lines = f.readlines()
+                    results_text = ''.join(results_lines[:3])  # Mostrar solo las tres primeras líneas
+                
+                text_label = Label(scrollable_frame, text=results_text, wraplength=200, anchor='center', justify='center')
+                text_label.grid(row=row + 1, column=col, padx=10, pady=10)
+                
+                col += 1
+                if col > 2:
+                    col = 0
+                    row += 2
 
 model = load_model(MODEL_PATH)
 cap = cv2.VideoCapture(0)
@@ -127,20 +235,39 @@ root = Tk()
 root.title("Clasificador de Flores")
 root.geometry(f"+{int(root.winfo_screenwidth()/2 - 320)}+{int(root.winfo_screenheight()/2 - 240)}")
 root.resizable(False, False)
-root.configure(bg='#E0E0E0')
+root.configure(bg='white')
 
-canvas = Canvas(root, width=640, height=480, bg='#E0E0E0')
+# Cambiar el icono de la ventana
+icon_path = './icon.png'  # Asegúrate de que este archivo exista
+icon_img = ImageTk.PhotoImage(file=icon_path)
+root.iconphoto(False, icon_img)
+
+canvas = Canvas(root, width=640, height=480, bg='white')
 canvas.pack(pady=20)
 
-prediction_label = Label(root, font=("Arial", 14), bg='#E0E0E0')
-label_others = Label(root, font=("Arial", 12, 'bold'), bg='#E0E0E0')
-other_labels = [Label(root, font=("Arial", 12), bg='#E0E0E0') for _ in range(2)]
+prediction_label = Label(root, font=('Berlin Sans FB', 14), bg='white')
+label_others = Label(root, font=('Berlin Sans FB', 12, 'bold'), bg='white')
+other_labels = [Label(root, font=('Berlin Sans FB', 12), bg='white') for _ in range(2)]
 
-finalize_button = Button(root, text="Finalizar", command=stop_prediction, font=("Arial", 14), bg='#B0C4DE', fg='black')
+finalize_button = Button(root, text="Finalizar", command=stop_prediction, font=('Berlin Sans FB', 14), bg='#B0C4DE', fg='black')
 finalize_button.pack(pady=20)
 
-restart_button = Button(root, text="Realizar otra predicción", command=restart_prediction, font=("Arial", 14), bg='#B0C4DE', fg='black')
-restart_button.pack_forget()
+# Crear un frame para contener los botones
+button_frame = Frame(root, bg='white')
+button_frame.pack(pady=20)
+
+save_button = Button(button_frame, text="Guardar predicción", command=save_prediction, font=('Berlin Sans FB', 14), bg='#B0C4DE', fg='black')
+save_button.grid(row=0, column=0, padx=10)
+
+restart_button = Button(button_frame, text="Realizar otra predicción", command=restart_prediction, font=('Berlin Sans FB', 14), bg='#B0C4DE', fg='black')
+restart_button.grid(row=0, column=1, padx=10)
+
+view_predictions_button = Button(button_frame, text="Ver Historial", command=view_predictions, font=('Berlin Sans FB', 14), bg='#B0C4DE', fg='black')
+view_predictions_button.grid(row=0, column=2, padx=10)
+
+save_button.grid_remove()
+restart_button.grid_remove()
+view_predictions_button.grid_remove()
 
 print("[INFO] Iniciando actualización de frames...")
 update_frame()
