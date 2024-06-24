@@ -23,7 +23,7 @@ IMAGE_SIZE = (256, 256)
 FRAME_RECT = (200, 100, 450, 350)
 BGR_TO_RGB = cv2.COLOR_BGR2RGB
 BRIGHTNESS_THRESHOLD_LOW = 30
-BRIGHTNESS_THRESHOLD_HIGH = 180
+BRIGHTNESS_THRESHOLD_HIGH = 100
 PREDICTION_DELAY = 50  # Delay de 50 ms entre predicciones
 
 # Variables globales
@@ -31,6 +31,7 @@ continue_prediction = True
 last_frame = None
 last_results = None
 prediction_saved = False
+frame_status = ""
 
 def load_model(path):
     if os.path.exists(path):
@@ -54,26 +55,28 @@ def predict_image(frame, model, class_names):
 def is_frame_dark(frame, threshold=BRIGHTNESS_THRESHOLD_LOW):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     brightness = np.mean(gray)
+    #print(f'Brightness: {brightness}')
     return brightness < threshold
 
 def is_frame_too_bright(frame, threshold=BRIGHTNESS_THRESHOLD_HIGH):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     brightness = np.mean(gray)
+    #print(f'Brightness: {brightness}')
     return brightness > threshold
 
 def show_prediction_results(results):
-    global last_results, prediction_saved
+    global last_results, prediction_saved, frame_status
     last_results = results
     prediction_saved = False  # Reset the flag when new results are shown
 
     # Configurar el texto principal
     most_likely, confidence = results[0]
-    result_text = f"Más probable: {most_likely} ({confidence * 100:.2f}%)"
+    result_text = f"Flor más probable: {most_likely} ({confidence * 100:.2f}%)"
     prediction_label.config(text=result_text, wraplength=600, anchor='w', justify='left')
-    prediction_label.pack(pady=10)
+    prediction_label.pack(pady=15)
 
     # Configurar el texto de las otras predicciones
-    label_others.config(text="También puede ser:", wraplength=600, anchor='w', justify='left')
+    label_others.config(text="Pero también puede ser:", wraplength=600, anchor='w', justify='left')
     label_others.pack(pady=5)
 
     for idx in range(1, 3):
@@ -82,8 +85,10 @@ def show_prediction_results(results):
         other_labels[idx - 1].config(text=result_text, wraplength=600, anchor='w', justify='left')
         other_labels[idx - 1].pack()
 
+    frame_status = "normal"
+
 def update_frame():
-    global last_frame
+    global last_frame, frame_status
     if continue_prediction:
         ret, frame = cap.read()
         if ret:
@@ -104,12 +109,14 @@ def update_frame():
                 label_others.pack_forget()
                 for label in other_labels:
                     label.pack_forget()
+                frame_status = "dark"
             elif is_frame_too_bright(frame):
                 prediction_label.config(text="Demasiada luz. No se puede realizar la predicción.", wraplength=600, anchor='w', justify='left')
                 prediction_label.pack(pady=10)
                 label_others.pack_forget()
                 for label in other_labels:
                     label.pack_forget()
+                frame_status = "bright"
             else:
                 crop_img = frame[FRAME_RECT[1]:FRAME_RECT[3], FRAME_RECT[0]:FRAME_RECT[2]]
                 results = predict_image(crop_img, model, CLASS_NAMES)
@@ -121,7 +128,10 @@ def update_frame():
 def save_prediction():
     global prediction_saved
     if last_frame is not None and last_results is not None:
-        if not prediction_saved:
+        if frame_status in ["dark", "bright"]:
+            print("[INFO] No hay nada que guardar debido a condiciones de luz inadecuadas.")
+            prediction_label.config(text="No hay nada que guardar debido a condiciones de luz inadecuadas.", wraplength=600, anchor='w', justify='left')
+        elif not prediction_saved:
             most_likely, _ = last_results[0]
             now = datetime.datetime.now()
             timestamp = now.strftime('%Y-%m-%d_%H-%M-%S')
@@ -148,7 +158,7 @@ def save_prediction():
 def stop_prediction():
     global continue_prediction
     continue_prediction = False
-    finalize_button.pack_forget()
+    finalize_button.place(x=2800, y=2800)
     save_button.grid()
     restart_button.grid()
     view_predictions_button.grid()
@@ -159,7 +169,8 @@ def restart_prediction():
     save_button.grid_remove()
     restart_button.grid_remove()
     view_predictions_button.grid_remove()
-    finalize_button.pack(pady=20)
+    finalize_button.place(x=280, y=544)
+    finalize_button.lift()
     update_frame()
 
 def view_predictions():
@@ -170,7 +181,20 @@ def view_predictions():
 
     pred_window = Toplevel(root)
     pred_window.title("Predicciones Anteriores")
-    pred_window.geometry("800x600")
+    pred_window.geometry("640x480")
+    pred_window.resizable(False, False)
+    pred_window.configure(bg='white')
+    
+    # Obtener las dimensiones de la pantalla
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    
+    # Calcular la posición x e y para centrar la ventana
+    position_right = int(screen_width/2 - 640/2)
+    position_down = int(screen_height/2 - 480/2)
+    
+    # Establecer la posición de la ventana
+    pred_window.geometry(f"640x480+{position_right}+{position_down}")
     
     # Cambiar el icono de la ventana
     icon_path = './icon.png'  # Asegúrate de que este archivo exista
@@ -197,6 +221,11 @@ def view_predictions():
     scrollbar.pack(side=RIGHT, fill=Y)
     canvas.pack(fill=BOTH, expand=True)
     
+    def on_mouse_wheel(event):
+        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+    
+    canvas.bind_all("<MouseWheel>", on_mouse_wheel)
+    
     row = 0
     col = 0
     for folder in os.listdir(pred_dir):
@@ -212,17 +241,17 @@ def view_predictions():
                 
                 img_label = Label(scrollable_frame, image=imgtk)
                 img_label.image = imgtk
-                img_label.grid(row=row, column=col, padx=10, pady=10)
+                img_label.grid(row=row, column=col, padx=30, pady=0)
                 
                 with open(results_path, "r") as f:
                     results_lines = f.readlines()
                     results_text = ''.join(results_lines[:3])  # Mostrar solo las tres primeras líneas
                 
-                text_label = Label(scrollable_frame, text=results_text, wraplength=200, anchor='center', justify='center')
-                text_label.grid(row=row + 1, column=col, padx=10, pady=10)
+                text_label = Label(scrollable_frame, text=results_text, wraplength=200, anchor='center', justify='left')
+                text_label.grid(row=row + 1, column=col, padx=0, pady=3)
                 
                 col += 1
-                if col > 2:
+                if col == 3:  # Si la columna actual es 3, reiniciar el contador de columnas y aumentar el contador de filas
                     col = 0
                     row += 2
 
@@ -233,7 +262,7 @@ if not cap.isOpened():
 
 root = Tk()
 root.title("Clasificador de Flores")
-root.geometry(f"+{int(root.winfo_screenwidth()/2 - 320)}+{int(root.winfo_screenheight()/2 - 240)}")
+root.geometry(f"+{int(root.winfo_screenwidth()/2 - 320)}+{int(root.winfo_screenheight()/2 - 340)}")
 root.resizable(False, False)
 root.configure(bg='white')
 
@@ -249,21 +278,22 @@ prediction_label = Label(root, font=('Berlin Sans FB', 14), bg='white')
 label_others = Label(root, font=('Berlin Sans FB', 12, 'bold'), bg='white')
 other_labels = [Label(root, font=('Berlin Sans FB', 12), bg='white') for _ in range(2)]
 
-finalize_button = Button(root, text="Finalizar", command=stop_prediction, font=('Berlin Sans FB', 14), bg='#B0C4DE', fg='black')
-finalize_button.pack(pady=20)
+finalize_button = Button(root, text="Finalizar", command=stop_prediction, font=('Berlin Sans FB', 14), bg='#041E42', fg='white')
+#establecer la posicion x e y del boton
+finalize_button.place(x=280, y=544)
 
 # Crear un frame para contener los botones
 button_frame = Frame(root, bg='white')
 button_frame.pack(pady=20)
 
-save_button = Button(button_frame, text="Guardar predicción", command=save_prediction, font=('Berlin Sans FB', 14), bg='#B0C4DE', fg='black')
-save_button.grid(row=0, column=0, padx=10)
+save_button = Button(button_frame, text="Guardar predicción", command=save_prediction, font=('Berlin Sans FB', 14), bg='#8CB3EA', fg='black')
+save_button.grid(row=0, column=0, padx=5)
 
-restart_button = Button(button_frame, text="Realizar otra predicción", command=restart_prediction, font=('Berlin Sans FB', 14), bg='#B0C4DE', fg='black')
-restart_button.grid(row=0, column=1, padx=10)
+restart_button = Button(button_frame, text="Realizar otra predicción", command=restart_prediction, font=('Berlin Sans FB', 14), bg='#041E42', fg='white')
+restart_button.grid(row=0, column=1, padx=5)
 
-view_predictions_button = Button(button_frame, text="Ver Historial", command=view_predictions, font=('Berlin Sans FB', 14), bg='#B0C4DE', fg='black')
-view_predictions_button.grid(row=0, column=2, padx=10)
+view_predictions_button = Button(button_frame, text="Ver Historial", command=view_predictions, font=('Berlin Sans FB', 14), bg='#8CB3EA', fg='black')
+view_predictions_button.grid(row=0, column=2, padx=5)
 
 save_button.grid_remove()
 restart_button.grid_remove()
