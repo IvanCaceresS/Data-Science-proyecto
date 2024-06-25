@@ -11,11 +11,11 @@ import datetime
 # Configuración de la ruta del modelo y nombres de las clases en español
 CLASS_NAMES = ['Margarita', 'Diente de león', 'Rosas', 'Girasoles', 'Tulipanes']
 CARE_INSTRUCTIONS = {
-    'Margarita': 'Riego moderado, mantener el suelo húmedo pero no encharcado. Luz solar indirecta. Fertilizar mensualmente durante la temporada de crecimiento.',
-    'Diente de león': 'Riego ligero, asegurándose de que el suelo se seque entre riegos. Pleno sol para un crecimiento óptimo. No requiere fertilización especial.',
-    'Rosas': 'Riego frecuente, mantener el suelo uniformemente húmedo. Luz solar directa, al menos 6 horas diarias. Podar regularmente para promover un crecimiento saludable. Fertilizar cada 4-6 semanas durante la temporada de crecimiento.',
-    'Girasoles': 'Riego abundante, especialmente durante el periodo de crecimiento. Pleno sol, requieren al menos 6-8 horas de luz solar al día. Suelo bien drenado y fértil. Fertilizar cada 2-3 semanas con un fertilizante balanceado.',
-    'Tulipanes': 'Riego moderado, mantener el suelo húmedo pero bien drenado. Luz solar indirecta. Plantar los bulbos en otoño para una floración primaveral. Fertilizar con un fertilizante de bulbos al plantar y nuevamente cuando emerjan las hojas.'
+    'Margarita': '💧 Riego moderado, mantener el suelo húmedo pero no encharcado.\n☀️ Luz solar indirecta.\n🌱 Fertilizar mensualmente durante la temporada de crecimiento.',
+    'Diente de león': '💧 Riego ligero, asegurándose de que el suelo se seque entre riegos.\n☀️ Pleno sol para un crecimiento óptimo.\n🌿 No requiere fertilización especial.',
+    'Rosas': '💧 Riego frecuente, mantener el suelo uniformemente húmedo.\n☀️ Luz solar directa, al menos 6 horas diarias.\n✂️ Podar regularmente para promover un crecimiento saludable.\n🌱 Fertilizar cada 4-6 semanas durante la temporada de crecimiento.',
+    'Girasoles': '💧 Riego abundante, especialmente durante el periodo de crecimiento.\n☀️ Pleno sol, requieren al menos 6-8 horas de luz solar al día.\n🌾 Suelo bien drenado y fértil.\n🌱 Fertilizar cada 2-3 semanas con un fertilizante balanceado.',
+    'Tulipanes': '💧 Riego moderado, mantener el suelo húmedo pero bien drenado.\n☀️ Luz solar indirecta.\n🌷 Plantar los bulbos en otoño para una floración primaveral.\n🌱 Fertilizar con un fertilizante de bulbos al plantar y nuevamente cuando emerjan las hojas.'
 }
 
 MODEL_PATH = './modelos/modelo_resnet50_1000epocas_32batchsize_200patience.keras'
@@ -55,13 +55,11 @@ def predict_image(frame, model, class_names):
 def is_frame_dark(frame, threshold=BRIGHTNESS_THRESHOLD_LOW):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     brightness = np.mean(gray)
-    #print(f'Brightness: {brightness}')
     return brightness < threshold
 
 def is_frame_too_bright(frame, threshold=BRIGHTNESS_THRESHOLD_HIGH):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     brightness = np.mean(gray)
-    #print(f'Brightness: {brightness}')
     return brightness > threshold
 
 def show_prediction_results(results):
@@ -151,14 +149,18 @@ def save_prediction():
             print(f"[INFO] Predicción guardada en {dir_name}")
             prediction_label.config(text="Predicción guardada.", wraplength=600, anchor='w', justify='left')
             prediction_saved = True
+            view_cuidados_button.grid()  # Mostrar el botón "Ver Cuidados" solo si se ha guardado una predicción
         else:
             print("[INFO] Predicción ya fue guardada.")
             prediction_label.config(text="Predicción ya fue guardada.", wraplength=600, anchor='w', justify='left')
+    else:
+        print("[INFO] No hay nada que guardar.")
+        prediction_label.config(text="No hay nada que guardar.", wraplength=600, anchor='w', justify='left')
 
 def stop_prediction():
     global continue_prediction
     continue_prediction = False
-    finalize_button.place(x=2800, y=2800)
+    finalize_button.place_forget()
     save_button.grid()
     restart_button.grid()
     view_predictions_button.grid()
@@ -169,6 +171,7 @@ def restart_prediction():
     save_button.grid_remove()
     restart_button.grid_remove()
     view_predictions_button.grid_remove()
+    view_cuidados_button.grid_remove()
     finalize_button.place(x=280, y=544)
     finalize_button.lift()
     update_frame()
@@ -255,6 +258,36 @@ def view_predictions():
                     col = 0
                     row += 2
 
+def view_cuidados():
+    if last_results:
+        most_likely, _ = last_results[0]
+        cuidados_text = CARE_INSTRUCTIONS[most_likely]
+        
+        cuidados_window = Toplevel(root)
+        cuidados_window.title(f"Cuidados para {most_likely}")
+        cuidados_window.geometry("450x200")
+        cuidados_window.resizable(False, False)
+        cuidados_window.configure(bg='white')
+        
+        # Cambiar el icono de la ventana
+        icon_path = './icon.png'  # Asegúrate de que este archivo exista
+        icon_img = ImageTk.PhotoImage(file=icon_path)
+        cuidados_window.iconphoto(False, icon_img)
+        
+        label_cuidados = Label(cuidados_window, text=cuidados_text, font=('Berlin Sans FB', 12), wraplength=350, bg='white')
+        label_cuidados.pack(pady=20, padx=20)
+        
+        # Obtener las dimensiones de la pantalla
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
+        
+        # Calcular la posición x e y para centrar la ventana
+        position_right = int(screen_width/2 - 450/2)
+        position_down = int(screen_height/2 - 200/2)
+        
+        # Establecer la posición de la ventana
+        cuidados_window.geometry(f"450x200+{position_right}+{position_down}")
+
 model = load_model(MODEL_PATH)
 cap = cv2.VideoCapture(0)
 if not cap.isOpened():
@@ -279,7 +312,6 @@ label_others = Label(root, font=('Berlin Sans FB', 12, 'bold'), bg='white')
 other_labels = [Label(root, font=('Berlin Sans FB', 12), bg='white') for _ in range(2)]
 
 finalize_button = Button(root, text="Finalizar", command=stop_prediction, font=('Berlin Sans FB', 14), bg='#041E42', fg='white')
-#establecer la posicion x e y del boton
 finalize_button.place(x=280, y=544)
 
 # Crear un frame para contener los botones
@@ -294,6 +326,11 @@ restart_button.grid(row=0, column=1, padx=5)
 
 view_predictions_button = Button(button_frame, text="Ver Historial", command=view_predictions, font=('Berlin Sans FB', 14), bg='#8CB3EA', fg='black')
 view_predictions_button.grid(row=0, column=2, padx=5)
+
+view_cuidados_button = Button(button_frame, text="Ver Cuidados", command=view_cuidados, font=('Berlin Sans FB', 14), bg='#8CB3EA', fg='black')
+view_cuidados_button.grid(row=1, column=1, padx=5)
+
+view_cuidados_button.grid_remove()
 
 save_button.grid_remove()
 restart_button.grid_remove()
