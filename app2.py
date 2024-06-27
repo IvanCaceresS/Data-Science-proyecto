@@ -34,10 +34,10 @@ def predict_image(image, model, class_names):
     
     return results
 
-def generate_dir_name(results, image_data):
+def generate_dir_name(results):
     most_likely, _ = results[0]
-    unique_id = hashlib.md5(image_data + str(results).encode()).hexdigest()
-    dir_name = f"{most_likely}_{unique_id}"
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    dir_name = f"{most_likely}_{timestamp}"
     return dir_name
 
 @app.route('/')
@@ -52,19 +52,17 @@ def predict():
     
     results = predict_image(image, model, CLASS_NAMES)
     most_likely, _ = results[0]
-    dir_name = generate_dir_name(results, image_data)
+    dir_name = generate_dir_name(results)
     
-    # Create directory if it does not exist
-    if not os.path.exists(f"./predicciones/{dir_name}"):
-        os.makedirs(f"./predicciones/{dir_name}", exist_ok=True)
+    os.makedirs(f"./predicciones/{dir_name}", exist_ok=True)
     
-        img_path = os.path.join(f"./predicciones/{dir_name}", "imagen.jpg")
-        cv2.imwrite(img_path, image)
+    img_path = os.path.join(f"./predicciones/{dir_name}", "imagen.jpg")
+    cv2.imwrite(img_path, image)
     
-        results_path = os.path.join(f"./predicciones/{dir_name}", "resultados.txt")
-        with open(results_path, "w") as f:
-            for result in results:
-                f.write(f"{result[0]}: {result[1] * 100:.2f}%\n")
+    results_path = os.path.join(f"./predicciones/{dir_name}", "resultados.txt")
+    with open(results_path, "w") as f:
+        for result in results:
+            f.write(f"{result[0]}: {result[1] * 100:.2f}%\n")
     
     response = {
         'prediction': f"Flor más probable: {most_likely} ({results[0][1] * 100:.2f}%)",
@@ -84,17 +82,19 @@ def save_prediction():
     most_likely, _ = results[0]
     
     # Create a unique identifier for the prediction based on image data and results
-    dir_name = generate_dir_name(results, image_data)
+    unique_id = hashlib.md5(image_data + str(results).encode()).hexdigest()
+    dir_name = f"./predicciones/{most_likely}_{unique_id}"
     
-    if os.path.exists(f"./predicciones/{dir_name}"):
+    # Verify if a directory with the same unique_id exists
+    if any(unique_id in folder for folder in os.listdir("./predicciones")):
         return jsonify({"message": "Predicción ya fue guardada."})
     
-    os.makedirs(f"./predicciones/{dir_name}", exist_ok=True)
+    os.makedirs(dir_name, exist_ok=True)
     
-    img_path = os.path.join(f"./predicciones/{dir_name}", "imagen.jpg")
+    img_path = os.path.join(dir_name, "imagen.jpg")
     cv2.imwrite(img_path, image)
     
-    results_path = os.path.join(f"./predicciones/{dir_name}", "resultados.txt")
+    results_path = os.path.join(dir_name, "resultados.txt")
     with open(results_path, "w") as f:
         for result in results:
             f.write(f"{result[0]}: {result[1] * 100:.2f}%\n")

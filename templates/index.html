@@ -32,6 +32,7 @@
         }
         #predictionResult, #otherResults, #cuidadosResult, #capturedImage, #saveButton, #cuidadosButton, #newPredictionButton {
             display: none;
+            margin: auto;
         }
         #predictionsHistory {
             display: none;
@@ -52,8 +53,8 @@
     </div>
     <br><br>
     <button id="startButton" onclick="startVideo()">Iniciar Cámara</button>
-    <button id="predictButton" onclick="captureImage()" style="display: none;">Realizar Predicción</button>
-    <button id="saveButton" onclick="savePrediction()">Guardar Predicción</button>
+    <button id="predictButton" onclick="captureImage()" style="display: none; margin: auto;">Realizar Predicción</button>
+    <!-- <button id="saveButton" onclick="savePrediction()">Guardar Predicción</button> -->
     <button id="cuidadosButton" onclick="toggleCuidados()">Ver Cuidados</button>
     <button id="newPredictionButton" onclick="startNewPrediction()">Realizar una nueva predicción</button>
     <button id="historyButton" onclick="toggleHistory()">Ver Historial</button>
@@ -80,14 +81,14 @@
                     stream.getTracks().forEach(track => track.stop());
                 }
                 stream = await navigator.mediaDevices.getUserMedia({
-                    video: true
+                    video: { facingMode: { exact: "environment" } } // Forzar uso de la cámara trasera
                 });
                 video.srcObject = stream;
                 video.style.display = "block";
                 capturedImage.style.display = "none";
                 document.getElementById("startButton").style.display = "none";
                 document.getElementById("predictButton").style.display = "block";
-                document.getElementById("saveButton").style.display = "none";
+                // document.getElementById("saveButton").style.display = "none";
                 document.getElementById("cuidadosButton").style.display = "none";
                 document.getElementById("newPredictionButton").style.display = "none";
                 document.getElementById("predictionResult").style.display = "none";
@@ -159,8 +160,14 @@
                 return;
             }
 
+            clearOverlay(); // Limpiar el recuadro antes de capturar la imagen
             const dataUrl = canvas.toDataURL("image/jpeg");
             sendImage(dataUrl, "/predict", true);
+        }
+
+        function clearOverlay() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            canvas.style.display = "none"; // Ocultar el canvas después de limpiar
         }
 
         function resetVideo() {
@@ -182,11 +189,11 @@
                     if (isFinal) {
                         document.getElementById("predictionResult").style.display = "block";
                         document.getElementById("otherResults").style.display = "block";
-                        document.getElementById("saveButton").style.display = "block";
+                        // document.getElementById("saveButton").style.display = "block";
                         document.getElementById("cuidadosButton").style.display = "block";
                         document.getElementById("newPredictionButton").style.display = "block";
                         document.getElementById("predictButton").style.display = "none";
-                        capturedImage.src = "data:image/jpeg;base64," + data.image;
+                        capturedImage.src = dataUrl;  // Usar el dataUrl original
                         video.style.display = "none";
                         capturedImage.style.display = "block";
                         stopVideo();
@@ -278,11 +285,13 @@
             startVideo();
             document.getElementById("predictButton").style.display = "block";
             document.getElementById("newPredictionButton").style.display = "none";
-            document.getElementById("saveButton").style.display = "none";
+            // document.getElementById("saveButton").style.display = "none";
             document.getElementById("cuidadosButton").style.display = "none";
             document.getElementById("predictionResult").style.display = "none";
             document.getElementById("otherResults").style.display = "none";
             document.getElementById("cuidadosResult").style.display = "none";
+            canvas.style.display = "block"; // Asegurarse de que el canvas esté visible
+            drawOverlay(); // Volver a dibujar el recuadro
         }
 
         window.addEventListener('resize', drawOverlay);
