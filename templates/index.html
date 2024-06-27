@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clasificador de Flores</title>
+    <style>
+        body { text-align: center; }
+        .container {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            margin: auto;
+        }
+        #videoElement, #capturedImage {
+            width: 100%;
+            height: auto;
+            display: none;
+        }
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            width: 100%;
+            height: 100%;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        #predictionResult, #otherResults, #cuidadosResult, #capturedImage, #saveButton, #cuidadosButton, #newPredictionButton {
+            display: none;
+        }
+        #predictionsHistory {
+            display: none;
+        }
+        #brightnessWarning {
+            display: none;
+            color: red;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Clasificador de Flores</h1>
+    <div class="container">
+        <video id="videoElement" autoplay playsinline></video>
+        <canvas id="overlay"></canvas>
+        <img id="capturedImage">
+    </div>
+    <br><br>
+    <button id="startButton" onclick="startVideo()">Iniciar Cámara</button>
+    <button id="predictButton" onclick="captureImage()" style="display: none;">Realizar Predicción</button>
+    <button id="saveButton" onclick="savePrediction()">Guardar Predicción</button>
+    <button id="cuidadosButton" onclick="toggleCuidados()">Ver Cuidados</button>
+    <button id="newPredictionButton" onclick="startNewPrediction()">Realizar una nueva predicción</button>
+    <button id="historyButton" onclick="toggleHistory()">Ver Historial</button>
+    <p id="predictionResult"></p>
+    <p id="otherResults"></p>
+    <p id="cuidadosResult"></p>
+    <p id="brightnessWarning"></p>
+    <div id="predictionsHistory"></div>
+
+    <script>
+        const video = document.querySelector("#videoElement");
+        const canvas = document.querySelector("#overlay");
+        const ctx = canvas.getContext("2d");
+        const capturedImage = document.querySelector("#capturedImage");
+        let stream = null;
+        const FRAME_SIZE = 0.6; // Tamaño relativo del recuadro (60% del menor de los lados)
+        let FRAME_RECT = {}; // Se inicializa FRAME_RECT como un objeto vacío
+        const BRIGHTNESS_THRESHOLD_LOW = 30;
+        const BRIGHTNESS_THRESHOLD_HIGH = 180;
+
+        async function startVideo() {
+            try {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: true
+                });
+                video.srcObject = stream;
+                video.style.display = "block";
+                capturedImage.style.display = "none";
+                document.getElementById("startButton").style.display = "none";
+                document.getElementById("predictButton").style.display = "block";
+                document.getElementById("saveButton").style.display = "none";
+                document.getElementById("cuidadosButton").style.display = "none";
+                document.getElementById("newPredictionButton").style.display = "none";
+                document.getElementById("predictionResult").style.display = "none";
+                document.getElementById("otherResults").style.display = "none";
+                document.getElementById("cuidadosResult").style.display = "none";
+                document.getElementById("brightnessWarning").style.display = "none";
+
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    drawOverlay();
+                };
+            } catch (err) {
+                console.error("Error accessing the camera: " + err);
+                alert("No se puede acceder a la cámara. Asegúrate de haber dado los permisos necesarios.");
+            }
+        }
+
+        function drawOverlay() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const size = Math.min(canvas.width, canvas.height) * FRAME_SIZE;
+            const rectX = (canvas.width - size) / 2;
+            const rectY = (canvas.height - size) / 2;
+
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(rectX, rectY, size, size);
+
+            // Update FRAME_RECT with actual pixel values for use in captureImage
+            FRAME_RECT = {
+                scaledX: rectX,
+                scaledY: rectY,
+                scaledWidth: size,
+                scaledHeight: size
+            };
+        }
+
+        function getFrameBrightness(frame) {
+            const data = frame.data;
+            let colorSum = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                const avg = (r + g + b) / 3;
+                colorSum += avg;
+            }
+            return colorSum / (frame.width * frame.height);
+        }
+
+        function captureImage() {
+            const canvas = document.createElement("canvas");
+            canvas.width = FRAME_RECT.scaledWidth;
+            canvas.height = FRAME_RECT.scaledHeight;
+            const context = canvas.getContext("2d");
+            context.drawImage(video, FRAME_RECT.scaledX, FRAME_RECT.scaledY, FRAME_RECT.scaledWidth, FRAME_RECT.scaledHeight, 0, 0, FRAME_RECT.scaledWidth, FRAME_RECT.scaledHeight);
+
+            const frame = context.getImageData(0, 0, canvas.width, canvas.height);
+            const brightness = getFrameBrightness(frame);
+
+            if (brightness < BRIGHTNESS_THRESHOLD_LOW) {
+                alert(`Cámara tapada o muy poca luz. Brillo actual: ${brightness.toFixed(2)} (Mínimo: ${BRIGHTNESS_THRESHOLD_LOW})`);
+                resetVideo();
+                return;
+            } else if (brightness > BRIGHTNESS_THRESHOLD_HIGH) {
+                alert(`Demasiada luz. Brillo actual: ${brightness.toFixed(2)} (Máximo: ${BRIGHTNESS_THRESHOLD_HIGH})`);
+                resetVideo();
+                return;
+            }
+
+            const dataUrl = canvas.toDataURL("image/jpeg");
+            sendImage(dataUrl, "/predict", true);
+        }
+
+        function resetVideo() {
+            stopVideo();
+            setTimeout(startVideo, 1000); // Añadir un pequeño retraso antes de reiniciar la cámara
+        }
+
+        function sendImage(dataUrl, endpoint, isFinal = false) {
+            fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image: dataUrl })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (endpoint === "/predict") {
+                    document.getElementById("predictionResult").innerText = data.prediction;
+                    document.getElementById("otherResults").innerText = data.others.join("\n");
+                    if (isFinal) {
+                        document.getElementById("predictionResult").style.display = "block";
+                        document.getElementById("otherResults").style.display = "block";
+                        document.getElementById("saveButton").style.display = "block";
+                        document.getElementById("cuidadosButton").style.display = "block";
+                        document.getElementById("newPredictionButton").style.display = "block";
+                        document.getElementById("predictButton").style.display = "none";
+                        capturedImage.src = "data:image/jpeg;base64," + data.image;
+                        video.style.display = "none";
+                        capturedImage.style.display = "block";
+                        stopVideo();
+                    }
+                } else if (endpoint === "/save_prediction") {
+                    alert(data.message);
+                } else if (endpoint === "/view_cuidados") {
+                    document.getElementById("cuidadosResult").innerText = data.cuidados;
+                    document.getElementById("cuidadosResult").style.display = "block";
+                }
+            })
+            .catch(error => console.error("Error:", error));
+        }
+
+        function stopVideo() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        }
+
+        function savePrediction() {
+            const dataUrl = capturedImage.src;
+            const imageBase64 = dataUrl.split(',')[1];
+            fetch("/save_prediction", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image: imageBase64 })
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+            })
+            .catch(error => console.error("Error:", error));
+        }
+
+        function viewCuidados() {
+            const dataUrl = capturedImage.src;
+            const imageBase64 = dataUrl.split(',')[1];
+            sendImage(imageBase64, "/view_cuidados");
+        }
+
+        function viewPredictions() {
+            fetch("/view_predictions")
+                .then(response => response.json())
+                .then(data => {
+                    const historyDiv = document.getElementById("predictionsHistory");
+                    historyDiv.innerHTML = "";
+                    data.forEach(prediction => {
+                        const img = document.createElement("img");
+                        img.src = prediction.image;
+                        img.width = 150;
+                        img.height = 150;
+                        const p = document.createElement("p");
+                        p.innerText = prediction.results;
+                        historyDiv.appendChild(img);
+                        historyDiv.appendChild(p);
+                    });
+                })
+                .catch(error => console.error("Error:", error));
+        }
+
+        function toggleHistory() {
+            const historyDiv = document.getElementById("predictionsHistory");
+            const historyButton = document.getElementById("historyButton");
+            if (historyDiv.style.display === "none" || historyDiv.style.display === "") {
+                viewPredictions();
+                historyDiv.style.display = "block";
+                historyButton.innerText = "Ocultar Historial";
+            } else {
+                historyDiv.style.display = "none";
+                historyButton.innerText = "Ver Historial";
+            }
+        }
+
+        function toggleCuidados() {
+            const cuidadosDiv = document.getElementById("cuidadosResult");
+            const cuidadosButton = document.getElementById("cuidadosButton");
+            if (cuidadosDiv.style.display === "none" || cuidadosDiv.style.display === "") {
+                viewCuidados();
+                cuidadosDiv.style.display = "block";
+                cuidadosButton.innerText = "Ocultar Cuidados";
+            } else {
+                cuidadosDiv.style.display = "none";
+                cuidadosButton.innerText = "Ver Cuidados";
+            }
+        }
+
+        function startNewPrediction() {
+            startVideo();
+            document.getElementById("predictButton").style.display = "block";
+            document.getElementById("newPredictionButton").style.display = "none";
+            document.getElementById("saveButton").style.display = "none";
+            document.getElementById("cuidadosButton").style.display = "none";
+            document.getElementById("predictionResult").style.display = "none";
+            document.getElementById("otherResults").style.display = "none";
+            document.getElementById("cuidadosResult").style.display = "none";
+        }
+
+        window.addEventListener('resize', drawOverlay);
+    </script>
+</body>
+</html>
