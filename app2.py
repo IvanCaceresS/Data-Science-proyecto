@@ -64,13 +64,16 @@ def predict():
         for result in results:
             f.write(f"{result[0]}: {result[1] * 100:.2f}%\n")
     
+    others_list = [f"{r[0]}: {r[1] * 100:.2f}%" for r in results[1:]]
+    
     response = {
         'prediction': f"Flor más probable: {most_likely} ({results[0][1] * 100:.2f}%)",
-        'others': [f"{r[0]}: {r[1] * 100:.2f}%" for r in results[1:]],
+        'others': ["También puede ser:"] + others_list,
         'image': base64.b64encode(image_data).decode('utf-8')
     }
     
     return jsonify(response)
+
 
 @app.route('/save_prediction', methods=['POST'])
 def save_prediction():

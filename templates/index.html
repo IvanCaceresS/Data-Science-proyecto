@@ -5,7 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clasificador de Flores</title>
     <style>
-        body { text-align: center; }
+        body {
+            text-align: center;
+            background-color: #e9e0d4;
+        }
+        #Titulo {
+            font-size: 70px; 
+            background: url('https://t1.uc.ltmcdn.com/es/posts/1/7/3/cineraria_53371_3_600.jpg') repeat; /* URL de la imagen de fondo */
+            background-size: cover;
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+            margin-bottom: 0;
+            font-family: monospace;
+        }
+        #Subtitulo {
+            margin-top: 0;
+            font-size: 20px;
+            color: black;
+            font-family: monospace;
+        }
         .container {
             position: relative;
             width: 100%;
@@ -25,39 +45,123 @@
             width: 100%;
             height: 100%;
         }
-        button {
-            margin: 5px;
-            padding: 10px 20px;
-            font-size: 16px;
+
+        /* CSS BOTONES */
+        /* BOTON INICIO CAMARA */
+        .boton-personalizado {
+        appearance: none;
+        background-color: #2ea44f;
+        border: 1px solid rgba(27, 31, 35, .15);
+        border-radius: 6px;
+        box-shadow: rgba(27, 31, 35, .1) 0 1px 0;
+        box-sizing: border-box;
+        color: #fff;
+        cursor: pointer;
+        display: inline-block;
+        font-family: -apple-system,system-ui,monospace,Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 20px;
+        padding: 6px 16px;
+        position: relative;
+        text-align: center;
+        text-decoration: none;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: manipulation;
+        vertical-align: middle;
+        white-space: nowrap;
+        margin: auto auto 10px auto;
         }
-        #predictionResult, #otherResults, #cuidadosResult, #capturedImage, #saveButton, #cuidadosButton, #newPredictionButton {
+
+        .boton-personalizado:focus:not(:focus-visible):not(.focus-visible) {
+        box-shadow: none;
+        outline: none;
+        }
+
+        .boton-personalizado:hover {
+        background-color: #2c974b;
+        }
+
+        .boton-personalizado:focus {
+        box-shadow: rgba(46, 164, 79, .4) 0 0 0 3px;
+        outline: none;
+        }
+
+        .boton-personalizado:disabled {
+        background-color: #94d3a2;
+        border-color: rgba(27, 31, 35, .1);
+        color: rgba(255, 255, 255, .8);
+        cursor: default;
+        }
+
+        .boton-personalizado:active {
+        background-color: #298e46;
+        box-shadow: rgba(20, 70, 32, .2) 0 1px 0 inset;
+        }
+        /* FIN BOTON INICIO CAMARA */
+
+        /* FIN CSS BOTONES */
+
+        #predictionResult, #otherResults, #cuidadosResult, #capturedImage, #saveButton, #cuidadosButton, #newPredictionButton, #predictButton {
             display: none;
-            margin: auto;
         }
+        
         #predictionsHistory {
             display: none;
+            margin: 20px auto auto auto;
+            border: black 1px solid;
+            border-radius: 8px;
+            max-width: 350px;
+            background-color: #e7e2db;
         }
         #brightnessWarning {
             display: none;
             color: red;
             margin-top: 10px;
         }
+        p:not(#predictionResult):not(#otherResults){
+            font-size: 24px; /* Tamaño de la fuente */
+            padding: 10px; /* Espacio alrededor del texto */
+            border: black 1px solid; /* Borde alrededor del texto */
+            border-radius: 8px; /* Bordes redondeados */
+            background-color: #d6e0d8; /* Fondo blanco semi-transparente */
+            color: black; /* Color del texto */
+            text-align: left; /* Alinear el texto al centro */
+            max-width: 250px;
+            margin: 0 auto 10px auto; /* Centrar el elemento */
+        }
+        #predictionResult,#otherResults{
+            font-size: 24px; /* Tamaño de la fuente */
+            padding: 10px; /* Espacio alrededor del texto */
+            border: black 1px solid; /* Borde alrededor del texto */
+            border-radius: 8px; /* Bordes redondeados */
+            background-color: #c7ffd2; /* Fondo blanco semi-transparente */
+            color: black; /* Color del texto */
+            text-align: left; /* Alinear el texto al centro */
+            max-width: 250px;
+            margin: 0 auto 10px auto; /* Centrar el elemento */
+        }
+        img {
+            display: block;
+            margin: 10px auto 5px auto;
+        }
     </style>
 </head>
 <body>
-    <h1>Clasificador de Flores</h1>
+    <h1 id="Titulo">TOBIAS</h1>
+    <h2 id="Subtitulo">Tactical Observation Botanical Identification Analysis System </h2>
     <div class="container">
         <video id="videoElement" autoplay playsinline></video>
         <canvas id="overlay"></canvas>
         <img id="capturedImage">
     </div>
     <br><br>
-    <button id="startButton" onclick="startVideo()">Iniciar Cámara</button>
-    <button id="predictButton" onclick="captureImage()" style="display: none; margin: auto;">Realizar Predicción</button>
-    <!-- <button id="saveButton" onclick="savePrediction()">Guardar Predicción</button> -->
-    <button id="cuidadosButton" onclick="toggleCuidados()">Ver Cuidados</button>
-    <button id="newPredictionButton" onclick="startNewPrediction()">Realizar una nueva predicción</button>
-    <button id="historyButton" onclick="toggleHistory()">Ver Historial</button>
+    <button id="startButton" class="boton-personalizado" onclick="startVideo()">Iniciar Cámara</button>
+    <button id="predictButton" class="boton-personalizado" onclick="captureImage()">Realizar Predicción</button>
+    <button id="cuidadosButton" class="boton-personalizado" onclick="toggleCuidados()">Ver Cuidados</button>
+    <button id="newPredictionButton" class="boton-personalizado" onclick="startNewPrediction()">Realizar una nueva predicción</button>
+    <button id="historyButton" class="boton-personalizado" onclick="toggleHistory()">Ver Historial</button>
     <p id="predictionResult"></p>
     <p id="otherResults"></p>
     <p id="cuidadosResult"></p>
@@ -80,15 +184,21 @@
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                 }
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { exact: "environment" } } // Forzar uso de la cámara trasera
-                });
+
+                const constraints = {
+                    video: true
+                };
+
+                if (isMobileDevice()) {
+                    constraints.video = { facingMode: { exact: "environment" } };
+                }
+
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
                 video.style.display = "block";
                 capturedImage.style.display = "none";
                 document.getElementById("startButton").style.display = "none";
                 document.getElementById("predictButton").style.display = "block";
-                // document.getElementById("saveButton").style.display = "none";
                 document.getElementById("cuidadosButton").style.display = "none";
                 document.getElementById("newPredictionButton").style.display = "none";
                 document.getElementById("predictionResult").style.display = "none";
@@ -105,6 +215,10 @@
                 console.error("Error accessing the camera: " + err);
                 alert("No se puede acceder a la cámara. Asegúrate de haber dado los permisos necesarios.");
             }
+        }
+
+        function isMobileDevice() {
+            return (typeof window.orientation !== "undefined") || (navigator.userAgent.indexOf('IEMobile') !== -1);
         }
 
         function drawOverlay() {
@@ -189,7 +303,6 @@
                     if (isFinal) {
                         document.getElementById("predictionResult").style.display = "block";
                         document.getElementById("otherResults").style.display = "block";
-                        // document.getElementById("saveButton").style.display = "block";
                         document.getElementById("cuidadosButton").style.display = "block";
                         document.getElementById("newPredictionButton").style.display = "block";
                         document.getElementById("predictButton").style.display = "none";
@@ -285,7 +398,6 @@
             startVideo();
             document.getElementById("predictButton").style.display = "block";
             document.getElementById("newPredictionButton").style.display = "none";
-            // document.getElementById("saveButton").style.display = "none";
             document.getElementById("cuidadosButton").style.display = "none";
             document.getElementById("predictionResult").style.display = "none";
             document.getElementById("otherResults").style.display = "none";
