@@ -1,3 +1,7 @@
+nohup python app.py &
+nohup ngrok http 5000 &
+
+
 # Data Science proyecto
 
 ## Requisitos
