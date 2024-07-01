@@ -1,5 +1,4 @@
-nohup python app.py &
-nohup ngrok http 5000 &
+ngrok http --domain=stable-funny-rooster.ngrok-free.app 5000
 
 
 # Data Science proyecto
