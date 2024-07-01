@@ -8,7 +8,7 @@ from tkinter import font as tkFont
 from PIL import Image, ImageTk
 import datetime
 
-# Configuración de la ruta del modelo y nombres de las clases en español
+# Configuración de la ruta del modelo y nombres de las clases en español - test
 CLASS_NAMES = ['Margarita', 'Diente de león', 'Rosas', 'Girasoles', 'Tulipanes']
 CARE_INSTRUCTIONS = {
     'Margarita': '💧 Riego moderado, mantener el suelo húmedo pero no encharcado.\n☀️ Luz solar indirecta.\n🌱 Fertilizar mensualmente durante la temporada de crecimiento.',
